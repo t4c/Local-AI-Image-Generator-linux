@@ -1261,6 +1261,7 @@ function findComponentFile(type) {
     for (const f of files) {
       const lower = f.toLowerCase();
       const fullPath = path.join(dir, f);
+      if (lower.endsWith(".tmp") || lower.endsWith(".part") || lower.endsWith(".download")) continue;
       try {
         if (!fs.statSync(fullPath).isFile()) continue;
       } catch (_) {
