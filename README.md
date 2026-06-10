@@ -1,94 +1,88 @@
-# 🖼️ Local AI Image Generator
+# 🖼️ Local AI Image Generator (Linux CUDA Fork)
 
-### An easy, zero-setup Stable Diffusion GUI for Windows. Run GGUF & Safetensors models offline without Python configuration.
-
-
-
-| **Generation Workspace** | **Model Library** | **Image Constraints** |
-| :---: | :---: | :---: |
-| <img src="assets/dashboard.png" width="100%" style="border-radius: 6px;"> | <img src="assets/models.png" width="100%" style="border-radius: 6px;"> | <img src="assets/settings.png" width="100%" style="border-radius: 6px;"> |
+### A ridiculously fast, purely local Stable Diffusion GUI running directly on C++. No Python bloat, no Anaconda nonsense, no Windows tears. Just raw C++ powering your Linux GPU.
 
 ---
 
-</div>
+> 🐧 **Note on this Fork:** This repository is a native Linux-only fork of the original Windows-centric [techjarves/Local-AI-Image-Generator](https://github.com/techjarves/Local-AI-Image-Generator).
 
-<div align="center">
-  <p>🎥 <b>Watch the Setup & Demo Video:</b> <a href="https://youtu.be/ESELhY-G_9w">https://youtu.be/ESELhY-G_9w</a></p>
-  <a href="https://youtu.be/ESELhY-G_9w">
-    <img src="https://img.youtube.com/vi/ESELhY-G_9w/maxresdefault.jpg" alt="Local AI Image Generator Video Tutorial" style="width:100%; max-width:800px; border-radius: 8px; margin-top: 10px;">
-  </a>
-</div>
 
 ---
 
-## 📖 Overview
-**Local AI Image Generator** is a zero-configuration, portable desktop environment for running Stable Diffusion (Safetensors/GGUF/CKPT) offline on Windows. Double-clicking `start.bat` automatically handles dependency setup, GPU backend matching (CUDA/Vulkan), and launches a high-performance local web workspace.
+## 🖤 Why this Fork?
+The original codebase was a Windows slave. We brought out the whip and domesticated it for Linux:
+*   **100% Native Linux:** No Wine, no WSL gymnastics.
+*   **Automated CUDA Compilation:** If you have an Nvidia card, `./setup.sh` automatically compiles `stable-diffusion.cpp` with native CUDA acceleration on first run.
+*   **True LAN Party Capabilities:** The server listens on `0.0.0.0` and the React frontend dynamically grabs the API route via `window.location.hostname`. You can let your heavy GPU sweat in the basement while generating images.
 
 ---
 
-## ⚡ Quick Start
-1. **Launch:** Double-click **`start.bat`** (downloads portable Node.js and pre-compiled GPU backend binaries on first run).
-2. **Add Models:** Drop `.safetensors`, `.gguf`, or `.ckpt` weights into `app/models/` (or download them via the **Model Manager** tab in the UI).
-3. **Generate:** Open `http://localhost:1420` in your browser, select your model, and write a prompt.
+## ⚡ Setup & Start
+
+### 1. Install Dependencies
+You'll need the usual tools for some hot C++ action. On Debian/Ubuntu-based systems:
+```bash
+sudo apt update
+sudo apt install build-essential cmake nodejs npm
+# And of course, a working CUDA Toolkit (nvcc must be in your PATH!)
+```
+
+### 2. Clone & Start
+Let the script do the dirty work:
+```bash
+chmod +x start.sh setup.sh
+./start.sh
+```
+The script verifies your CUDA environment, clones and compiles `stable-diffusion.cpp` in the background, builds the frontend, and boots up the web server.
+
+### 3. Feed the Models
+We support `.safetensors` and `.gguf` weights (SD 1.5, SDXL, etc.).
+*   Just drop your weights into `app/models/`
+*   Or use the integrated **Model Manager** in the Web UI to download models directly via Hugging Face URLs.
+
+### 4. Multi-File Models (Flux / Hunyuan / Qwen / Wan etc.)
+For multi-file models like Flux (e.g. `flux1-dev-Q5_0.gguf`), the raw weights are not enough. The backend requires separate components like VAE and Text-Encoders.
+Simply place them into the folder `app/models/components/`:
+*   **VAE / Autoencoder:** `ae.safetensors` (or `ae.gguf`)
+*   **CLIP-L Text-Encoder:** `clip_l.safetensors` (or `clip_l-f16.gguf`)
+*   **T5XXL Text-Encoder:** `t5xxl.safetensors` (e.g. the high-performance `t5xxl_q8_0.gguf` version)
+
+Once these files are present, the system will automatically detect them when loading a Flux model and start the C++ server with the correct `--diffusion-model`, `--clip_l`, `--t5xxl`, and `--vae` flags.
+
+> 💡 **Tip:** You can download all required components automatically using the provided bash script:
+> ```bash
+> chmod +x download_flux_components.sh
+> ./download_flux_components.sh
+> ```
+> This script will fetch and place the VAE, CLIP-L, and an optimized Q8_0 T5XXL Text Encoder into the correct folder, with resume capability.
+
+### 5. Have Fun
+Open your browser at:
+`http://localhost:1420` (or your Linux server's IP within the LAN)
 
 ---
 
-## ✨ Features
-*   **100% Offline & Private:** Inference runs completely locally on your hardware.
-*   **Auto-Detected GPU Acceleration:** Configures **CUDA** for Nvidia cards, and **Vulkan** for AMD or Intel Arc GPUs.
-*   **Zero System Footprint:** Node.js is sandboxed inside the folder. No global environment paths are altered.
-*   **Integrated Model Manager:** Paste a Hugging Face URL to download weights directly, or drag-and-drop local weight files to import them.
-*   **Real-time Telemetry:** Monitor RAM, VRAM, CPU, and GPU load directly in the UI.
-*   **Local Gallery:** Saves generated PNGs alongside prompt metadata JSONs to `app/outputs/`.
-
----
-
-## 📁 Repository Structure
+## 📁 Storage Structure
 ```
 local-ai-image-generator/
-├── start.bat                  # Main double-click entrypoint
-├── LICENSE                    # MIT Open Source license
-├── .gitignore
-├── README.md                  
+├── start.sh                   # Main Linux entry point
+├── setup.sh                   # Fresh & crisp backend compilation
 ├── scripts/
-│   ├── setup.ps1              # Automated GPU-detect and environment installer
-│   ├── reset.ps1              # Cleans runtime environments (keeps models & outputs)
-│   └── serve.cjs              # UI web server and backend lifecycle manager
+│   └── serve.cjs              # Static Node.js file & process manager
 └── app/
-    ├── frontend/              # UI source code (Vite + React)
-    ├── models/                # Place weights here (.safetensors, .gguf, .ckpt)
-    └── outputs/               # Saved images and parameters metadata
+    ├── frontend/              # React Frontend (Vite)
+    ├── models/                # Where your models sleep (.safetensors, .gguf)
+    └── outputs/               # Where the hot results land (.png & .json Metadata)
 ```
 
 ---
 
-## 🖥️ GPU Compatibility Matrix
-
-| GPU Vendor | Tech | Status | Notes |
-| :--- | :--- | :--- | :--- |
-| **Nvidia** | CUDA | ✅ Native | Maps `sd-cuda.exe` with Nvidia SDK 12 optimizations. |
-| **AMD Radeon** | Vulkan | ✅ Native | Maps `sd-vulkan.exe` with Vulkan API acceleration. |
-| **Intel Arc** | Vulkan | ✅ Native | Maps `sd-vulkan.exe` for Intel hardware. |
-| **Integrated / None** | CPU | ⚠️ Fallback | Runs on logical CPU threads (slow). |
+## 🍆 Performance & VRAM Appetite
+Since we build directly on top of C++ (`stable-diffusion.cpp`), VRAM consumption is kept strictly on a leash.
+*   **CUDA GPU (e.g., RTX 3060):** Generates a 512x512 image (20 steps) in about **10 seconds**.
+*   **CPU Fallback:** If you don't have a GPU (why do you even do this to yourself?), it will run painfully slow on CPU cores. Get CUDA.
 
 ---
 
-## ⏱️ Performance Benchmarks
-
-Typical generation times for an image with **20 steps** (e.g. 512x512 resolution; actual times can vary depending on specific hardware specifications, clock speeds, and system load):
-
-*   **CUDA GPU (Nvidia RTX):** ~10 seconds.
-*   **Vulkan GPU (AMD / Intel Arc):** ~89 seconds.
-*   **GTX Vulkan Fallback (Nvidia GTX):** ~30 seconds (Vulkan runs significantly faster on legacy GTX series cards since they lack Tensor Cores).
-*   **CPU (Fallback):** ~150 - 300+ seconds (highly dependent on processor core count, speed, and AVX instruction sets).
-
----
-
-## 🛠️ Troubleshooting
-*   **Reset Environment:** If a build fails or you want to clear dependencies, run `scripts/reset.ps1`. (This preserves your models and generated images).
-*   **Port Conflicts:** The frontend uses `1420` by default. The backend tries `8080` first, then automatically falls back to a free port if `8080` is already busy.
-
----
-
-## 📝 License
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file. Bundles [stable-diffusion.cpp](https://github.com/leejet/stable-diffusion.cpp) (MIT License). Model weights are subject to their respective creators' licenses.
+## 🛡️ License
+This repository is licensed under the MIT License. It uses [stable-diffusion.cpp](https://github.com/leejet/stable-diffusion.cpp) as its backend.

@@ -12,7 +12,7 @@ let cachedBackendPort = null;
 export const EXPECTED_SERVER_BUILD = "polish-setup-v1";
 
 const isLocalServerMode = () => {
-  return typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+  return typeof window !== "undefined";
 };
 
 async function getBackendPort() {
@@ -31,7 +31,7 @@ async function getBackendPort() {
 }
 
 async function getBackendBaseUrl() {
-  return `http://127.0.0.1:${await getBackendPort()}`;
+  return `http://${window.location.hostname}:${await getBackendPort()}`;
 }
 
 export function formatBytes(bytes) {
@@ -53,7 +53,7 @@ export function normalizeModel(model) {
   };
 }
 
-async function readJsonResponse(res, fallbackMessage = "The local server returned an invalid response.") {
+async function readJsonResponse(res, fallbackMessage = "The local server returned an invalid response.", skipOkCheck = false) {
   const text = await res.text();
   let data = {};
   try {
@@ -63,7 +63,7 @@ async function readJsonResponse(res, fallbackMessage = "The local server returne
     throw new Error(looksLikeHtml ? "The local server is serving an older frontend/API. Restart the image generator." : fallbackMessage);
   }
 
-  if (!res.ok || data.ok === false) {
+  if (!res.ok || (!skipOkCheck && data.ok === false)) {
     if (data.error === "Unknown API endpoint") {
       throw new Error("Restart the image generator so the local server loads the latest API.");
     }
@@ -75,7 +75,7 @@ async function readJsonResponse(res, fallbackMessage = "The local server returne
 export async function getHealth() {
   try {
     const res = await fetch("/api/health");
-    const data = await readJsonResponse(res, "The local server returned an invalid health response.");
+    const data = await readJsonResponse(res, "The local server returned an invalid health response.", true);
     return {
       ...data,
       stale: data.build !== EXPECTED_SERVER_BUILD,
@@ -209,7 +209,7 @@ export async function listLocalModels() {
     }
   }
 
-  const isLocalServerMode = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+  const isLocalServerMode = typeof window !== "undefined";
   if (isLocalServerMode) {
     return await listModelsFromDisk();
   }
@@ -749,7 +749,7 @@ export async function deleteModel(filename) {
     return await invoke("delete_model_file", { filename });
   }
 
-  const isLocalServerMode = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+  const isLocalServerMode = typeof window !== "undefined";
   if (isLocalServerMode) {
     try {
       const res = await fetch("/api/delete-model", {

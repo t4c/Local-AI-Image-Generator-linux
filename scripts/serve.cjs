@@ -25,8 +25,8 @@ const ROOT    = path.join(__dirname, "..");
 const DIST    = path.join(ROOT, "app", "dist");
 const osPlatform = process.platform;
 const BACKEND_PATHS = {
-  cuda: path.join(ROOT, "app", "backend", "win", "cuda", "sd-cuda.exe"),
-  vulkan: path.join(ROOT, "app", "backend", "win", "vulkan", "sd-vulkan.exe"),
+  cuda: osPlatform === "win32" ? path.join(ROOT, "app", "backend", "win", "cuda", "sd-cuda.exe") : path.join(ROOT, "app", "backend", "linux", "sd-cuda"),
+  vulkan: osPlatform === "win32" ? path.join(ROOT, "app", "backend", "win", "vulkan", "sd-vulkan.exe") : path.join(ROOT, "app", "backend", "linux", "sd-vulkan"),
   mac: path.join(ROOT, "app", "backend", "mac", "sd"),
   linux: path.join(ROOT, "app", "backend", "linux", "sd-vulkan"),
 };
@@ -51,11 +51,25 @@ if (osPlatform === "win32") {
 } else if (osPlatform === "darwin") {
   BACKEND_PATH = BACKEND_PATHS.mac;
 } else {
-  BACKEND_PATH = BACKEND_PATHS.linux;
+  let hasNvidia = false;
+  try {
+    execSync("nvidia-smi", { stdio: "ignore" });
+    hasNvidia = true;
+  } catch (_) {}
+
+  if (hasNvidia && fs.existsSync(BACKEND_PATHS.cuda)) {
+    BACKEND_PATH = BACKEND_PATHS.cuda;
+  } else {
+    BACKEND_PATH = BACKEND_PATHS.linux;
+  }
 }
 const MODELS  = path.join(ROOT, "app", "models");
 if (!fs.existsSync(MODELS)) {
   fs.mkdirSync(MODELS, { recursive: true });
+}
+const COMPONENTS = path.join(MODELS, "components");
+if (!fs.existsSync(COMPONENTS)) {
+  fs.mkdirSync(COMPONENTS, { recursive: true });
 }
 const OUTPUTS = path.join(ROOT, "app", "outputs");
 if (!fs.existsSync(OUTPUTS)) {
@@ -344,9 +358,25 @@ function getSetupPaths() {
       outputs: OUTPUTS,
     };
   } else if (osPlatform === "darwin") {
+    let nodePath = path.join(appDir, "tools", "node-mac", "bin", "node");
+    if (!fs.existsSync(nodePath)) {
+      try {
+        nodePath = execSync("which node").toString().trim();
+      } catch (_) {
+        nodePath = process.execPath;
+      }
+    }
+    let npmPath = path.join(appDir, "tools", "node-mac", "bin", "npm");
+    if (!fs.existsSync(npmPath)) {
+      try {
+        npmPath = execSync("which npm").toString().trim();
+      } catch (_) {
+        npmPath = "/usr/bin/npm";
+      }
+    }
     return {
-      node: path.join(appDir, "tools", "node-mac", "bin", "node"),
-      npm: path.join(appDir, "tools", "node-mac", "bin", "npm"),
+      node: nodePath,
+      npm: npmPath,
       distIndex: path.join(DIST, "index.html"),
       macBackend: BACKEND_PATHS.mac,
       models: MODELS,
@@ -354,11 +384,27 @@ function getSetupPaths() {
     };
   } else {
     // Linux / WSL
+    let nodePath = path.join(appDir, "tools", "node-linux", "bin", "node");
+    if (!fs.existsSync(nodePath)) {
+      try {
+        nodePath = execSync("which node").toString().trim();
+      } catch (_) {
+        nodePath = process.execPath;
+      }
+    }
+    let npmPath = path.join(appDir, "tools", "node-linux", "bin", "npm");
+    if (!fs.existsSync(npmPath)) {
+      try {
+        npmPath = execSync("which npm").toString().trim();
+      } catch (_) {
+        npmPath = "/usr/bin/npm";
+      }
+    }
     return {
-      node: path.join(appDir, "tools", "node-linux", "bin", "node"),
-      npm: path.join(appDir, "tools", "node-linux", "bin", "npm"),
+      node: nodePath,
+      npm: npmPath,
       distIndex: path.join(DIST, "index.html"),
-      linuxBackend: BACKEND_PATHS.linux,
+      linuxBackend: BACKEND_PATH,
       models: MODELS,
       outputs: OUTPUTS,
     };
@@ -516,14 +562,10 @@ function hasNvidiaGpu() {
 function getBackendOptions() {
   if (cachedBackendOptions) return cachedBackendOptions;
 
-  const cudaAvailable = osPlatform === "win32" && hasNvidiaGpu() && backendAccepts(BACKEND_PATHS.cuda, "cuda");
-  const cudaInstalled = osPlatform === "win32" && fs.existsSync(BACKEND_PATHS.cuda);
-  const vulkanInstalled = (osPlatform === "win32" && fs.existsSync(BACKEND_PATHS.vulkan)) ||
-                          (osPlatform === "linux" && fs.existsSync(BACKEND_PATHS.linux));
-  const vulkanAvailable = vulkanInstalled && backendAccepts(
-    osPlatform === "win32" ? BACKEND_PATHS.vulkan : BACKEND_PATHS.linux,
-    "vulkan"
-  );
+  const cudaAvailable = (osPlatform === "win32" || osPlatform === "linux") && hasNvidiaGpu() && backendAccepts(BACKEND_PATHS.cuda, "cuda");
+  const cudaInstalled = fs.existsSync(BACKEND_PATHS.cuda);
+  const vulkanInstalled = fs.existsSync(BACKEND_PATHS.vulkan);
+  const vulkanAvailable = vulkanInstalled && backendAccepts(BACKEND_PATHS.vulkan, "vulkan");
   const options = [{ id: "cpu", label: "CPU", available: true }];
   if (vulkanAvailable) options.push({ id: "vulkan", label: "Vulkan GPU", available: true });
   if (cudaAvailable) options.push({ id: "cuda", label: "CUDA GPU", available: true });
@@ -578,10 +620,10 @@ function backendAccepts(binaryPath, backendName) {
 
 function selectBackendPath(useGpu, backendType = "auto") {
   const resolvedType = resolveBackendType(useGpu, backendType);
-  if (osPlatform === "win32" && resolvedType === "cuda" && fs.existsSync(BACKEND_PATHS.cuda)) {
+  if (fs.existsSync(BACKEND_PATHS.cuda) && resolvedType === "cuda") {
     return BACKEND_PATHS.cuda;
   }
-  if (osPlatform === "win32" && fs.existsSync(BACKEND_PATHS.vulkan)) {
+  if (fs.existsSync(BACKEND_PATHS.vulkan) && resolvedType === "vulkan") {
     return BACKEND_PATHS.vulkan;
   }
   return BACKEND_PATH;
@@ -734,13 +776,45 @@ async function startBackend(settings = {}) {
   }
 
   const args = [
+    "--listen-ip",   "0.0.0.0",
     "--listen-port", String(PORT_BACKEND),
-    "--model",       currentSettings.model,
+  ];
+
+  const ext = path.extname(currentSettings.model.toLowerCase());
+  const filenameLower = path.basename(currentSettings.model).toLowerCase();
+  const isMultiFile = ext === ".gguf" && (
+    filenameLower === "stable-diffusion-xl-base-1.0-q4_0.gguf" ||
+    filenameLower.includes("stable-diffusion-xl-base-1.0") ||
+    filenameLower.includes("z_image") ||
+    filenameLower.includes("z-image") ||
+    filenameLower.includes("zimage") ||
+    filenameLower.includes("qwen") ||
+    filenameLower.includes("hidream") ||
+    filenameLower.includes("hunyuan") ||
+    filenameLower.includes("wan") ||
+    filenameLower.includes("flux")
+  );
+
+  if (isMultiFile) {
+    args.push("--diffusion-model", currentSettings.model);
+    
+    const clip_l = findComponentFile("clip_l");
+    const t5xxl = findComponentFile("t5xxl");
+    const vae = findComponentFile("vae");
+    
+    if (clip_l) args.push("--clip_l", clip_l);
+    if (t5xxl) args.push("--t5xxl", t5xxl);
+    if (vae) args.push("--vae", vae);
+  } else {
+    args.push("--model", currentSettings.model);
+  }
+
+  args.push(
     "--steps",       String(currentSettings.steps),
     "--cfg-scale",   String(currentSettings.cfgScale),
     "--sampling-method", currentSettings.sampler,
     "--threads",     String(runThreads),
-  ];
+  );
 
   const requestedBackend = resolveBackendType(currentSettings.useGpu, currentSettings.backendType);
   if (requestedBackend === "cpu") {
@@ -762,7 +836,7 @@ async function startBackend(settings = {}) {
       "--backend", "cuda0",
       "--params-backend", "cuda0",
       "--rng", "cuda",
-      "--sampler-rng", "cuda",
+      "--sampler-rng", "cuda"
     );
   }
 
@@ -1175,6 +1249,44 @@ function isModelFile(filename) {
   return lower.endsWith(".safetensors") || lower.endsWith(".gguf") || lower.endsWith(".ckpt");
 }
 
+function findComponentFile(type) {
+  const dirs = [
+    path.join(MODELS, "components"),
+    MODELS
+  ];
+  
+  for (const dir of dirs) {
+    if (!fs.existsSync(dir)) continue;
+    const files = fs.readdirSync(dir);
+    for (const f of files) {
+      const lower = f.toLowerCase();
+      const fullPath = path.join(dir, f);
+      try {
+        if (!fs.statSync(fullPath).isFile()) continue;
+      } catch (_) {
+        continue;
+      }
+
+      if (type === "clip_l") {
+        if ((lower.includes("clip_l") || lower.includes("clip-l")) && !lower.includes("vision")) {
+          return fullPath;
+        }
+      } else if (type === "t5xxl") {
+        if (lower.includes("t5xxl") || lower.includes("t5-xxl") || lower.includes("t5_xxl")) {
+          return fullPath;
+        }
+      } else if (type === "vae") {
+        if (lower === "ae.safetensors" || lower === "ae.gguf" || lower.startsWith("ae.") || lower.includes("vae") || lower.startsWith("ae-") || lower.startsWith("ae_")) {
+          if (!lower.includes("flux1") && !lower.includes("flux-") && !lower.includes("schnell") && !lower.includes("dev")) {
+            return fullPath;
+          }
+        }
+      }
+    }
+  }
+  return null;
+}
+
 function formatBytes(bytes) {
   const value = Number(bytes) || 0;
   if (value <= 0) return "0 B";
@@ -1215,7 +1327,21 @@ function getModelLoadIssue(modelPath) {
       if (knownDiffusionOnlyGguf) {
         return `${filename} is not supported as a one-click model in this app. This SDXL GGUF is a diffusion-only component and needs matching VAE/text encoder files instead of being loaded with --model. Use one of the recommended Safetensors SDXL/SD 1.5 checkpoints, or import a complete single-file GGUF checkpoint.`;
       }
-      return `${filename} looks like a multi-file diffusion GGUF. This app currently loads single-file SD 1.5/SDXL checkpoints directly. Models like Z-Image, Qwen, Flux, HiDream, Hunyuan, and Wan usually need extra files such as VAE/text encoders and must be launched with --diffusion-model instead of --model.`;
+      
+      const clip_l = findComponentFile("clip_l");
+      const t5xxl = findComponentFile("t5xxl");
+      const vae = findComponentFile("vae");
+
+      const missing = [];
+      if (!clip_l) missing.push("CLIP-L Text Encoder (z. B. clip_l.safetensors oder clip_l-f16.gguf)");
+      if (!t5xxl) missing.push("T5XXL Text Encoder (z. B. t5xxl_q8_0.gguf oder t5xxl-q5_k_m.gguf)");
+      if (!vae) missing.push("VAE / Autoencoder (z. B. ae.safetensors oder ae.gguf)");
+
+      if (missing.length > 0) {
+        return `${filename} ist ein Multi-File-Modell und benötigt zusätzliche Komponenten. Erstelle den Ordner 'app/models/components/' und lege dort folgende fehlende Dateien ab:\n\n` + 
+               missing.map(m => `• ${m}`).join("\n") + 
+               `\n\nBenenne die Dateien entsprechend um, damit das System sie automatisch erkennt.`;
+      }
     }
   }
 
@@ -1524,7 +1650,7 @@ const server = http.createServer(async (req, res) => {
     await killBackend();
     await new Promise(r => setTimeout(r, 500));
     const newSettings = {};
-    if (body.model)    newSettings.model    = path.join(MODELS, body.model);
+    if (body.model)    newSettings.model    = path.join(MODELS, path.basename(body.model));
     if (body.steps)    newSettings.steps    = parseInt(body.steps);
     if (body.cfgScale) newSettings.cfgScale = parseFloat(body.cfgScale);
     if (body.sampler)  newSettings.sampler  = body.sampler;
@@ -1667,8 +1793,24 @@ const server = http.createServer(async (req, res) => {
   }
 
   // ── Static frontend files ─────────────────────────────────────────────────
-  let filePath = path.join(DIST, req.url === "/" ? "index.html" : req.url);
-  filePath = filePath.split("?")[0];
+  let decodedUrl;
+  try {
+    decodedUrl = decodeURIComponent(req.url);
+  } catch (_) {
+    decodedUrl = req.url;
+  }
+  let relativePath = decodedUrl.split("?")[0];
+  if (relativePath === "/") relativePath = "index.html";
+
+  let filePath = path.resolve(path.join(DIST, relativePath));
+
+  // Guard against path traversal
+  if (!filePath.startsWith(DIST)) {
+    res.writeHead(403);
+    res.end("Forbidden");
+    return;
+  }
+
   if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
     filePath = path.join(DIST, "index.html");
   }
@@ -1683,7 +1825,7 @@ const server = http.createServer(async (req, res) => {
   });
 });
 
-server.listen(PORT_FRONTEND, "127.0.0.1", () => {
+server.listen(PORT_FRONTEND, "0.0.0.0", () => {
   console.log("");
   console.log("  ============================================================");
   console.log("   LOCAL AI IMAGE GENERATOR  |  Running");
