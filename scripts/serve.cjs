@@ -820,8 +820,8 @@ async function startBackend(settings = {}) {
 
   args.push(
     "--steps",       String(currentSettings.steps),
-    "--cfg-scale",   String(currentSettings.cfgScale),
-    "--sampling-method", currentSettings.sampler,
+    "--cfg-scale",   isMultiFile ? "1.0" : String(currentSettings.cfgScale),
+    "--sampling-method", isMultiFile ? "euler" : currentSettings.sampler,
     "--threads",     String(runThreads),
   );
 
