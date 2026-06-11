@@ -294,10 +294,18 @@ function App() {
   useEffect(() => {
     if (activeModel) {
       const name = activeModel.toLowerCase();
-      if (name.includes("flux") || name.includes("schnell")) {
+      if (name.includes("schnell")) {
         setConstraints((prev) => ({
           ...prev,
           steps: 4,
+          cfgScale: 1.0,
+          width: 1024,
+          height: 1024,
+        }));
+      } else if (name.includes("flux")) {
+        setConstraints((prev) => ({
+          ...prev,
+          steps: 20,
           cfgScale: 1.0,
           width: 1024,
           height: 1024,
