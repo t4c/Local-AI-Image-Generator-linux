@@ -812,9 +812,7 @@ async function startBackend(settings = {}) {
     if (vae) args.push("--vae", vae);
 
     if (requestedBackend !== "cpu") {
-      args.push("--offload-to-cpu");
-      args.push("--max-vram", "10.0");
-      args.push("--stream-layers");
+      args.push("--clip-on-cpu");
     }
   } else {
     args.push("--model", currentSettings.model);
@@ -837,14 +835,14 @@ async function startBackend(settings = {}) {
   } else if (requestedBackend === "vulkan") {
     args.push(
       "--backend", "vulkan0",
-      "--params-backend", paramsBackend,
+      "--params-backend", isMultiFile ? "cpu" : paramsBackend,
       "--rng", "cpu",
       "--sampler-rng", "cpu",
     );
   } else if (requestedBackend === "cuda") {
     args.push(
       "--backend", "cuda0",
-      "--params-backend", paramsBackend,
+      "--params-backend", isMultiFile ? "cpu" : paramsBackend,
       "--rng", "cuda",
       "--sampler-rng", "cuda"
     );
