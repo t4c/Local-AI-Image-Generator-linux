@@ -834,14 +834,14 @@ async function startBackend(settings = {}) {
     );
   } else if (requestedBackend === "vulkan") {
     args.push(
-      "--backend", "vulkan0",
+      "--backend", isMultiFile ? "clip=cpu,t5=cpu,vae=vulkan0,diffusion=vulkan0" : "vulkan0",
       "--params-backend", isMultiFile ? "cpu" : paramsBackend,
       "--rng", "cpu",
-      "--sampler-rng", "cpu",
+      "--sampler-rng", "cpu"
     );
   } else if (requestedBackend === "cuda") {
     args.push(
-      "--backend", "cuda0",
+      "--backend", isMultiFile ? "clip=cpu,t5=cpu,vae=cuda0,diffusion=cuda0" : "cuda0",
       "--params-backend", isMultiFile ? "cpu" : paramsBackend,
       "--rng", "cuda",
       "--sampler-rng", "cuda"
