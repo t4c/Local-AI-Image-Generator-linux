@@ -293,7 +293,7 @@ function ImageConstraints({ constraints, setConstraints, activeModel, specs, bac
                   <label style={{ display: "flex", alignItems: "flex-start", gap: "10px", cursor: "pointer", fontSize: "0.85rem" }}>
                     <input
                       type="checkbox"
-                      checked={constraints.vaeTiling !== false}
+                      checked={constraints.vaeTiling === true}
                       onChange={(e) => updateConstraint("vaeTiling", e.target.checked)}
                       style={{
                         width: "16px",
@@ -314,7 +314,7 @@ function ImageConstraints({ constraints, setConstraints, activeModel, specs, bac
                   <label style={{ display: "flex", alignItems: "flex-start", gap: "10px", cursor: "pointer", fontSize: "0.85rem" }}>
                     <input
                       type="checkbox"
-                      checked={constraints.vaeOnCpu === true}
+                      checked={constraints.vaeOnCpu !== false}
                       onChange={(e) => updateConstraint("vaeOnCpu", e.target.checked)}
                       style={{
                         width: "16px",

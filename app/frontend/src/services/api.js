@@ -254,8 +254,8 @@ export async function startServer(modelPath, constraints) {
         threads:  constraints.threads  || 8,
         use_gpu:  constraints.useGpu !== false,
         backend_type: constraints.backendType || (constraints.useGpu === false ? "cpu" : "auto"),
-        vae_tiling: constraints.vaeTiling !== false,
-        vae_on_cpu: constraints.vaeOnCpu === true,
+        vae_tiling: constraints.vaeTiling === true,
+        vae_on_cpu: constraints.vaeOnCpu !== false,
       }),
     });
     const text = await res.text();
