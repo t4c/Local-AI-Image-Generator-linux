@@ -105,8 +105,8 @@ let currentSettings = {
   threads:  8,
   useGpu:   true,
   backendType: "auto",
-  vaeTiling: true,
-  vaeOnCpu:  false,
+  vaeTiling: false,
+  vaeOnCpu:  true,
 };
 
 let lastCpuSample = null;
@@ -833,15 +833,17 @@ async function startBackend(settings = {}) {
       "--sampler-rng", "cpu",
     );
   } else if (requestedBackend === "vulkan") {
+    const vaeDev = currentSettings.vaeOnCpu ? "cpu" : "vulkan0";
     args.push(
-      "--backend", isMultiFile ? "clip=cpu,t5=cpu,vae=vulkan0,diffusion=vulkan0" : "vulkan0",
+      "--backend", isMultiFile ? `clip=cpu,t5=cpu,vae=${vaeDev},diffusion=vulkan0` : "vulkan0",
       "--params-backend", isMultiFile ? "cpu" : paramsBackend,
       "--rng", "cpu",
       "--sampler-rng", "cpu"
     );
   } else if (requestedBackend === "cuda") {
+    const vaeDev = currentSettings.vaeOnCpu ? "cpu" : "cuda0";
     args.push(
-      "--backend", isMultiFile ? "clip=cpu,t5=cpu,vae=cuda0,diffusion=cuda0" : "cuda0",
+      "--backend", isMultiFile ? `clip=cpu,t5=cpu,vae=${vaeDev},diffusion=cuda0` : "cuda0",
       "--params-backend", isMultiFile ? "cpu" : paramsBackend,
       "--rng", "cuda",
       "--sampler-rng", "cuda"
