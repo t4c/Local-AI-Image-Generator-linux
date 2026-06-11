@@ -811,7 +811,7 @@ async function startBackend(settings = {}) {
     if (t5xxl) args.push("--t5xxl", t5xxl);
     if (vae) args.push("--vae", vae);
 
-    if (!isFlux || requestedBackend !== "cuda") {
+    if (requestedBackend !== "cpu") {
       args.push("--offload-to-cpu");
       args.push("--max-vram", "10.0");
       args.push("--stream-layers");
@@ -842,21 +842,12 @@ async function startBackend(settings = {}) {
       "--sampler-rng", "cpu",
     );
   } else if (requestedBackend === "cuda") {
-    if (isFlux) {
-      args.push(
-        "--backend", "clip=cpu,t5xxl=cpu,vae=cuda0,diffusion=cuda0",
-        "--params-backend", "clip=cpu,t5xxl=cpu,vae=cuda0,diffusion=cuda0",
-        "--rng", "cuda",
-        "--sampler-rng", "cuda"
-      );
-    } else {
-      args.push(
-        "--backend", "cuda0",
-        "--params-backend", paramsBackend,
-        "--rng", "cuda",
-        "--sampler-rng", "cuda"
-      );
-    }
+    args.push(
+      "--backend", "cuda0",
+      "--params-backend", paramsBackend,
+      "--rng", "cuda",
+      "--sampler-rng", "cuda"
+    );
   }
 
   if (currentSettings.vaeTiling) {
