@@ -25,30 +25,12 @@ const ROOT    = path.join(__dirname, "..");
 const DIST    = path.join(ROOT, "app", "dist");
 const osPlatform = process.platform;
 const BACKEND_PATHS = {
-  cuda: osPlatform === "win32" ? path.join(ROOT, "app", "backend", "win", "cuda", "sd-cuda.exe") : path.join(ROOT, "app", "backend", "linux", "sd-cuda"),
-  vulkan: osPlatform === "win32" ? path.join(ROOT, "app", "backend", "win", "vulkan", "sd-vulkan.exe") : path.join(ROOT, "app", "backend", "linux", "sd-vulkan"),
+  cuda: path.join(ROOT, "app", "backend", "linux", "sd-cuda"),
+  vulkan: path.join(ROOT, "app", "backend", "linux", "sd-vulkan"),
   mac: path.join(ROOT, "app", "backend", "mac", "sd"),
-  linux: path.join(ROOT, "app", "backend", "linux", "sd-vulkan"),
 };
 let BACKEND_PATH = "";
-if (osPlatform === "win32") {
-  let hasNvidia = false;
-  try {
-    execSync("nvidia-smi", { stdio: "ignore" });
-    hasNvidia = true;
-  } catch (_) {
-    const commonPath = "C:\\Program Files\\NVIDIA Corporation\\NVSMI\\nvidia-smi.exe";
-    if (fs.existsSync(commonPath)) {
-      hasNvidia = true;
-    }
-  }
-
-  if (hasNvidia && fs.existsSync(BACKEND_PATHS.cuda)) {
-    BACKEND_PATH = BACKEND_PATHS.cuda;
-  } else {
-    BACKEND_PATH = BACKEND_PATHS.vulkan;
-  }
-} else if (osPlatform === "darwin") {
+if (osPlatform === "darwin") {
   BACKEND_PATH = BACKEND_PATHS.mac;
 } else {
   let hasNvidia = false;
@@ -60,7 +42,7 @@ if (osPlatform === "win32") {
   if (hasNvidia && fs.existsSync(BACKEND_PATHS.cuda)) {
     BACKEND_PATH = BACKEND_PATHS.cuda;
   } else {
-    BACKEND_PATH = BACKEND_PATHS.linux;
+    BACKEND_PATH = BACKEND_PATHS.vulkan;
   }
 }
 const MODELS  = path.join(ROOT, "app", "models");
@@ -145,15 +127,46 @@ function getCpuUsagePercent() {
 function getGpuInfo() {
   if (cachedGpuInfo) return cachedGpuInfo;
 
-  if (osPlatform === "win32") {
+  if (osPlatform === "linux") {
     try {
       const output = execSync(
-        "powershell -NoProfile -Command \"Get-CimInstance Win32_VideoController | Select-Object -First 1 -ExpandProperty Name\"",
+        "nvidia-smi --query-gpu=name --format=csv,noheader",
         { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
       ).trim();
       if (output) {
-        cachedGpuInfo = { name: output };
+        cachedGpuInfo = { name: output.split(/\r?\n/)[0].trim() };
         return cachedGpuInfo;
+      }
+    } catch (_) {}
+
+    try {
+      const lspci = execSync("lspci", { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+      const lines = lspci.split(/\r?\n/);
+      for (const line of lines) {
+        if (/vga|3d/i.test(line) && /nvidia|amd|ati|intel/i.test(line)) {
+          const match = line.match(/(?:VGA compatible controller|3D controller):\s*(.+)/i);
+          if (match && match[1]) {
+            cachedGpuInfo = { name: match[1].trim() };
+            return cachedGpuInfo;
+          }
+        }
+      }
+    } catch (_) {}
+  } else if (osPlatform === "darwin") {
+    try {
+      const output = execSync(
+        "system_profiler SPDisplaysDataType",
+        { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+      );
+      const lines = output.split(/\r?\n/);
+      for (const line of lines) {
+        if (line.includes("Chipset Model:")) {
+          const name = line.split("Chipset Model:")[1].trim();
+          if (name) {
+            cachedGpuInfo = { name };
+            return cachedGpuInfo;
+          }
+        }
       }
     } catch (_) {}
   }
@@ -164,13 +177,6 @@ function getGpuInfo() {
 
 let nvidiaSmiCmd = "nvidia-smi";
 let hasNvidiaSmi = null;
-
-if (osPlatform === "win32") {
-  const commonPath = "C:\\Program Files\\NVIDIA Corporation\\NVSMI\\nvidia-smi.exe";
-  if (fs.existsSync(commonPath)) {
-    nvidiaSmiCmd = `"${commonPath}"`;
-  }
-}
 
 let isPollingVram = false;
 let lastVramPollTime = 0;
@@ -347,17 +353,7 @@ async function findAvailableBackendPort() {
 
 function getSetupPaths() {
   const appDir = path.join(ROOT, "app");
-  if (osPlatform === "win32") {
-    return {
-      node: path.join(appDir, "tools", "node-win", "node.exe"),
-      npm: path.join(appDir, "tools", "node-win", "npm.cmd"),
-      distIndex: path.join(DIST, "index.html"),
-      cudaBackend: BACKEND_PATHS.cuda,
-      vulkanBackend: BACKEND_PATHS.vulkan,
-      models: MODELS,
-      outputs: OUTPUTS,
-    };
-  } else if (osPlatform === "darwin") {
+  if (osPlatform === "darwin") {
     let nodePath = path.join(appDir, "tools", "node-mac", "bin", "node");
     if (!fs.existsSync(nodePath)) {
       try {
@@ -421,27 +417,21 @@ async function getHealth() {
     getDirInfo("Outputs folder", paths.outputs),
   ];
 
-  if (osPlatform === "win32") {
-    checks.push(getPathInfo("CUDA backend", paths.cudaBackend));
-    checks.push(getPathInfo("Vulkan backend", paths.vulkanBackend));
-  } else if (osPlatform === "darwin") {
+  if (osPlatform === "darwin") {
     checks.push(getPathInfo("Mac backend", paths.macBackend));
   } else {
     checks.push(getPathInfo("Linux backend", paths.linuxBackend));
   }
 
   let backendInstalled = false;
-  if (osPlatform === "win32") {
-    backendInstalled = checks.find((check) => check.label === "CUDA backend")?.exists ||
-      checks.find((check) => check.label === "Vulkan backend")?.exists;
-  } else if (osPlatform === "darwin") {
+  if (osPlatform === "darwin") {
     backendInstalled = checks.find((check) => check.label === "Mac backend")?.exists;
   } else {
     backendInstalled = checks.find((check) => check.label === "Linux backend")?.exists;
   }
 
   const criticalOk = checks
-    .filter((check) => !["CUDA backend", "Vulkan backend", "Linux backend", "Mac backend"].includes(check.label))
+    .filter((check) => !["Linux backend", "Mac backend"].includes(check.label))
     .every((check) => check.ok) && backendInstalled;
 
   const ports = {
@@ -454,10 +444,10 @@ async function getHealth() {
   ports.backend.ok = true;
 
   const issues = checks
-    .filter((check) => !check.ok && !["CUDA backend", "Vulkan backend", "Linux backend", "Mac backend"].includes(check.label))
+    .filter((check) => !check.ok && !["Linux backend", "Mac backend"].includes(check.label))
     .map((check) => `${check.label} is missing or not writable.`);
   if (!backendInstalled) {
-    issues.push(`No ${osPlatform === "win32" ? "Windows" : osPlatform === "darwin" ? "macOS" : "Linux"} backend binary is installed.`);
+    issues.push(`No ${osPlatform === "darwin" ? "macOS" : "Linux"} backend binary is installed.`);
   }
   return {
     ok: criticalOk && ports.backend.ok,
@@ -562,7 +552,7 @@ function hasNvidiaGpu() {
 function getBackendOptions() {
   if (cachedBackendOptions) return cachedBackendOptions;
 
-  const cudaAvailable = (osPlatform === "win32" || osPlatform === "linux") && hasNvidiaGpu() && backendAccepts(BACKEND_PATHS.cuda, "cuda");
+  const cudaAvailable = osPlatform === "linux" && hasNvidiaGpu() && backendAccepts(BACKEND_PATHS.cuda, "cuda");
   const cudaInstalled = fs.existsSync(BACKEND_PATHS.cuda);
   const vulkanInstalled = fs.existsSync(BACKEND_PATHS.vulkan);
   const vulkanAvailable = vulkanInstalled && backendAccepts(BACKEND_PATHS.vulkan, "vulkan");

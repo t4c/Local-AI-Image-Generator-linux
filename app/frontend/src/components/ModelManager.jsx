@@ -4,6 +4,38 @@ import { listLocalModels, startServer, stopServer, importModelFile, deleteModel,
 
 const MODEL_LIBRARY = [
   {
+    group: "Flux.1 - Next-Gen Quality (Requires Clip & T5 Components)",
+    items: [
+      {
+        name: "Flux.1 Dev GGUF (Q4_K_M)",
+        filename: "flux1-dev-Q4_K_M.gguf",
+        format: "GGUF",
+        approxSize: "7.5 GB",
+        resolution: "1024x1024",
+        notes: "Standard high-quality quantized Flux.1 Dev model. Highly recommended balance of quality and size.",
+        url: "https://huggingface.co/city96/FLUX.1-dev-gguf/resolve/main/flux1-dev-Q4_K_M.gguf",
+      },
+      {
+        name: "Flux.1 Dev GGUF (Q5_0)",
+        filename: "flux1-dev-Q5_0.gguf",
+        format: "GGUF",
+        approxSize: "8.3 GB",
+        resolution: "1024x1024",
+        notes: "Extra detailed quantized Flux.1 Dev model. Requires slightly more VRAM but preserves more details.",
+        url: "https://huggingface.co/city96/FLUX.1-dev-gguf/resolve/main/flux1-dev-Q5_0.gguf",
+      },
+      {
+        name: "Flux.1 Schnell GGUF (Q4_K_M)",
+        filename: "flux1-schnell-Q4_K_M.gguf",
+        format: "GGUF",
+        approxSize: "7.5 GB",
+        resolution: "1024x1024",
+        notes: "Hyper-fast Flux.1 Schnell model. Only needs 4 steps to generate gorgeous, high-resolution images.",
+        url: "https://huggingface.co/city96/FLUX.1-schnell-gguf/resolve/main/flux1-schnell-Q4_K_M.gguf",
+      },
+    ],
+  },
+  {
     group: "SDXL - Best Quality",
     items: [
       {
