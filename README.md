@@ -45,7 +45,7 @@ For multi-file models like Flux (e.g. `flux1-dev-Q5_0.gguf`), the raw weights ar
 Simply place them into the folder `app/models/components/`:
 *   **VAE / Autoencoder:** `ae.safetensors` (or `ae.gguf`)
 *   **CLIP-L Text-Encoder:** `clip_l.safetensors` (or `clip_l-f16.gguf`)
-*   **T5XXL Text-Encoder:** `t5xxl.safetensors` (e.g. the high-performance `t5xxl_q8_0.gguf` version)
+*   **T5XXL Text-Encoder:** `t5xxl.safetensors` (e.g. the stable `t5xxl_fp8_e4m3fn.safetensors` version)
 
 Once these files are present, the system will automatically detect them when loading a Flux model and start the C++ server with the correct `--diffusion-model`, `--clip_l`, `--t5xxl`, and `--vae` flags.
 
@@ -54,7 +54,7 @@ Once these files are present, the system will automatically detect them when loa
 > chmod +x download_flux_components.sh
 > ./download_flux_components.sh
 > ```
-> This script will fetch and place the VAE, CLIP-L, and an optimized Q8_0 T5XXL Text Encoder into the correct folder, with resume capability.
+> This script will fetch and place the VAE, CLIP-L, and the stable **FP8 Safetensors T5XXL Text Encoder** into the correct folder, with resume capability. This avoids mathematical NaNs in stable-diffusion.cpp that lead to blank/white images.
 
 ### 5. Have Fun
 Open your browser at:

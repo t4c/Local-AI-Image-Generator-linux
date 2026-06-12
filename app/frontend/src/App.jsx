@@ -293,57 +293,66 @@ function App() {
   // Sync active model settings default parameters
   useEffect(() => {
     if (activeModel) {
-      const name = activeModel.toLowerCase();
-      if (name.includes("schnell")) {
-        setConstraints((prev) => ({
-          ...prev,
-          steps: 4,
-          cfgScale: 1.0,
-          width: 1024,
-          height: 1024,
-        }));
-      } else if (name.includes("flux")) {
-        setConstraints((prev) => ({
-          ...prev,
-          steps: 20,
-          cfgScale: 1.0,
-          width: 1024,
-          height: 1024,
-        }));
-      } else if (name.includes("lightning") || name.includes("turbo")) {
-        setConstraints((prev) => ({
-          ...prev,
-          steps: 4,
-          cfgScale: 1.5,
-          width: 1024,
-          height: 1024,
-        }));
-      } else if (name.includes("sd15")) {
-        setConstraints((prev) => ({
-          ...prev,
-          steps: 25,
-          cfgScale: 7.0,
-          width: 512,
-          height: 512,
-        }));
-      } else if (name.includes("sd35")) {
-        setConstraints((prev) => ({
-          ...prev,
-          steps: 20,
-          cfgScale: 4.5,
-          width: 1024,
-          height: 1024,
-        }));
-      } else {
-        // Fallback for custom or SD 1.x models (like CyberRealistic or arbitrary safetensors)
-        setConstraints((prev) => ({
-          ...prev,
-          steps: 20,
-          cfgScale: 7.0,
-          width: 512,
-          height: 512,
-        }));
+      const filename = activeModel.toLowerCase();
+      
+      let steps = 20;
+      let cfgScale = 7.0;
+      let width = 512;
+      let height = 512;
+      let sampler = "euler_a";
+      let vaeOnCpu = false;
+
+      if (filename.includes("flux")) {
+        steps = filename.includes("schnell") ? 4 : 20;
+        cfgScale = 1.0;
+        width = 1024;
+        height = 1024;
+        sampler = "euler";
+        vaeOnCpu = true;
+      } else if (filename.includes("sdxl") || filename.includes("juggernaut") || filename.includes("pony")) {
+        steps = filename.includes("lightning") ? 4 : 25;
+        cfgScale = filename.includes("lightning") ? 1.0 : 5.0;
+        width = 1024;
+        height = 1024;
+        sampler = "euler_a";
+      } else if (filename.includes("sd3")) {
+        steps = 28;
+        cfgScale = 4.5;
+        width = 1024;
+        height = 1024;
+        sampler = "euler";
+        vaeOnCpu = true;
+      } else if (filename.includes("wan")) {
+        steps = 20;
+        cfgScale = 5.0;
+        width = 1024;
+        height = 1024;
+        sampler = "euler";
+        vaeOnCpu = true;
+      } else if (filename.includes("hunyuan")) {
+        steps = 30;
+        cfgScale = 5.0;
+        width = 1024;
+        height = 1024;
+        sampler = "euler";
+        vaeOnCpu = true;
+      } else if (filename.includes("sd2") || filename.includes("stable-diffusion-2")) {
+        steps = 20;
+        cfgScale = 7.5;
+        width = 768;
+        height = 768;
+        sampler = "euler_a";
       }
+
+      setConstraints((prev) => ({
+        ...prev,
+        steps,
+        cfgScale,
+        width,
+        height,
+        sampler,
+        vaeOnCpu: prev.vaeOnCpu !== undefined ? prev.vaeOnCpu : vaeOnCpu
+      }));
     }
   }, [activeModel]);
 

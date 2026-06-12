@@ -783,24 +783,10 @@ async function startBackend(settings = {}) {
   const requestedBackend = resolveBackendType(currentSettings.useGpu, currentSettings.backendType);
   const paramsBackend = requestedBackend === "vulkan" ? "vulkan0" : (requestedBackend === "cuda" ? "cuda0" : "cpu");
 
-  const ext = path.extname(currentSettings.model.toLowerCase());
   const filenameLower = path.basename(currentSettings.model).toLowerCase();
-  const isMultiFile = ext === ".gguf" && (
-    filenameLower === "stable-diffusion-xl-base-1.0-q4_0.gguf" ||
-    filenameLower.includes("stable-diffusion-xl-base-1.0") ||
-    filenameLower.includes("z_image") ||
-    filenameLower.includes("z-image") ||
-    filenameLower.includes("zimage") ||
-    filenameLower.includes("qwen") ||
-    filenameLower.includes("hidream") ||
-    filenameLower.includes("hunyuan") ||
-    filenameLower.includes("wan") ||
-    filenameLower.includes("flux")
-  );
+  const profile = detectModelFamily(currentSettings.model);
 
-  const isFlux = filenameLower.includes("flux");
-
-  if (isMultiFile) {
+  if (profile.isMultiFile) {
     args.push("--diffusion-model", currentSettings.model);
     
     const clip_l = findComponentFile("clip_l");
@@ -820,10 +806,15 @@ async function startBackend(settings = {}) {
 
   args.push(
     "--steps",       String(currentSettings.steps),
-    "--cfg-scale",   isMultiFile ? "1.0" : String(currentSettings.cfgScale),
-    "--sampling-method", isMultiFile ? "euler" : currentSettings.sampler,
+    "--cfg-scale",   profile.family === "flux" ? "1.0" : String(currentSettings.cfgScale),
+    "--sampling-method", profile.family === "flux" ? "euler" : currentSettings.sampler,
     "--threads",     String(runThreads),
   );
+
+  if (profile.family === "flux") {
+    const isSchnell = filenameLower.includes("schnell");
+    args.push("--guidance", isSchnell ? "1.0" : "3.5");
+  }
 
   if (requestedBackend === "cpu") {
     args.push(
@@ -834,20 +825,29 @@ async function startBackend(settings = {}) {
     );
   } else if (requestedBackend === "vulkan") {
     const vaeDev = currentSettings.vaeOnCpu ? "cpu" : "vulkan0";
+    const backendVal = profile.isMultiFile ? `clip=cpu,t5=cpu,vae=${vaeDev},diffusion=vulkan0` : "vulkan0";
     args.push(
-      "--backend", isMultiFile ? `clip=cpu,t5=cpu,vae=${vaeDev},diffusion=vulkan0` : "vulkan0",
-      "--params-backend", isMultiFile ? "cpu" : paramsBackend,
+      "--backend", backendVal,
+      "--params-backend", backendVal,
       "--rng", "cpu",
       "--sampler-rng", "cpu"
     );
   } else if (requestedBackend === "cuda") {
-    const vaeDev = currentSettings.vaeOnCpu ? "cpu" : "cuda0";
+    let backendVal = "cuda0";
+    if (profile.isMultiFile) {
+      const clipDev = profile.recommendedClipCpu ? "cpu" : "cuda0";
+      const vaeDev = (profile.recommendedVaeCpu || currentSettings.vaeOnCpu) ? "cpu" : "cuda0";
+      backendVal = `clip=${clipDev},t5xxl=${clipDev},vae=${vaeDev},diffusion=cuda0`;
+    }
     args.push(
-      "--backend", isMultiFile ? `clip=cpu,t5=cpu,vae=${vaeDev},diffusion=cuda0` : "cuda0",
-      "--params-backend", isMultiFile ? "cpu" : paramsBackend,
-      "--rng", "cuda",
-      "--sampler-rng", "cuda"
+      "--backend", backendVal,
+      "--params-backend", backendVal,
+      "--rng", "cpu",
+      "--sampler-rng", "cpu"
     );
+    if (profile.isMultiFile) {
+      args.push("--max-vram", "-1.0", "--stream-layers");
+    }
   }
 
   if (currentSettings.vaeTiling) {
@@ -1254,6 +1254,73 @@ const MIME = {
   ".woff2":"font/woff2", ".woff": "font/woff", ".ttf": "font/ttf",
 };
 
+function detectModelFamily(modelPath) {
+  const filename = path.basename(modelPath || "").toLowerCase();
+  const ext = path.extname(filename);
+  
+  const res = {
+    family: "sd15",
+    isMultiFile: false,
+    defaultSteps: 20,
+    defaultCfgScale: 7.0,
+    defaultSampler: "euler_a",
+    recommendedVaeCpu: false,
+    recommendedClipCpu: false,
+    warning: null
+  };
+
+  res.isMultiFile = ext === ".gguf" || [
+    "stable-diffusion-xl-base-1.0", "z_image", "zimage", "qwen", "hidream", "hunyuan", "wan", "flux"
+  ].some(k => filename.includes(k));
+
+  if (filename.includes("flux")) {
+    res.family = "flux";
+    res.defaultSteps = filename.includes("schnell") ? 4 : 20;
+    res.defaultCfgScale = 1.0;
+    res.defaultSampler = "euler";
+    res.recommendedVaeCpu = true;
+    res.recommendedClipCpu = true;
+    
+    const t5xxl = findComponentFile("t5xxl");
+    if (t5xxl && t5xxl.toLowerCase().endsWith(".gguf")) {
+      res.warning = "WARNUNG: Dein T5XXL Text-Encoder ist eine GGUF-Datei (z. B. t5xxl_q8_0.gguf). Bei manchen GGUF T5XXL-Dateien kann es in stable-diffusion.cpp zu Berechnungsfehlern (NaNs) kommen, die zu komplett weißen Bildern führen. Wenn das passiert, verwende bitte die offizielle .safetensors-Version (z. B. t5xxl_fp8_e4m3fn.safetensors).";
+    }
+  } else if (filename.includes("sdxl") || filename.includes("juggernaut") || filename.includes("pony")) {
+    res.family = "sdxl";
+    res.defaultSteps = filename.includes("lightning") ? 4 : 25;
+    res.defaultCfgScale = filename.includes("lightning") ? 1.0 : 5.0;
+    res.defaultSampler = "euler_a";
+  } else if (filename.includes("sd3")) {
+    res.family = "sd3";
+    res.defaultSteps = 28;
+    res.defaultCfgScale = 4.5;
+    res.defaultSampler = "euler";
+    res.recommendedVaeCpu = true;
+    res.recommendedClipCpu = true;
+  } else if (filename.includes("wan")) {
+    res.family = "wan";
+    res.defaultSteps = 20;
+    res.defaultCfgScale = 5.0;
+    res.defaultSampler = "euler";
+    res.recommendedVaeCpu = true;
+    res.recommendedClipCpu = true;
+  } else if (filename.includes("hunyuan")) {
+    res.family = "hunyuan";
+    res.defaultSteps = 30;
+    res.defaultCfgScale = 5.0;
+    res.defaultSampler = "euler";
+    res.recommendedVaeCpu = true;
+    res.recommendedClipCpu = true;
+  } else if (filename.includes("sd2") || filename.includes("stable-diffusion-2")) {
+    res.family = "sd2";
+    res.defaultSteps = 20;
+    res.defaultCfgScale = 7.5;
+    res.defaultSampler = "euler_a";
+  }
+
+  return res;
+}
+
 function isModelFile(filename) {
   const lower = String(filename || "").toLowerCase();
   return lower.endsWith(".safetensors") || lower.endsWith(".gguf") || lower.endsWith(".ckpt");
@@ -1309,7 +1376,6 @@ function formatBytes(bytes) {
 function getModelLoadIssue(modelPath) {
   const filename = path.basename(modelPath || "");
   const lower = filename.toLowerCase();
-  const ext = path.extname(lower);
   if (!modelPath || !fs.existsSync(modelPath)) {
     return `Model file not found: ${filename || "unknown model"}`;
   }
@@ -1319,40 +1385,29 @@ function getModelLoadIssue(modelPath) {
     return `${filename} is too small to be a complete image model (${formatBytes(stats.size)}). Delete it and download/import it again.`;
   }
 
-  if (ext === ".gguf") {
+  const profile = detectModelFamily(modelPath);
+  if (profile.isMultiFile) {
     const knownDiffusionOnlyGguf =
       lower === "stable-diffusion-xl-base-1.0-q4_0.gguf" ||
       lower.includes("stable-diffusion-xl-base-1.0");
-    const requiresSeparateComponents =
-      knownDiffusionOnlyGguf ||
-      lower.includes("z_image") ||
-      lower.includes("z-image") ||
-      lower.includes("zimage") ||
-      lower.includes("qwen") ||
-      lower.includes("hidream") ||
-      lower.includes("hunyuan") ||
-      lower.includes("wan") ||
-      lower.includes("flux");
 
-    if (requiresSeparateComponents) {
-      if (knownDiffusionOnlyGguf) {
-        return `${filename} is not supported as a one-click model in this app. This SDXL GGUF is a diffusion-only component and needs matching VAE/text encoder files instead of being loaded with --model. Use one of the recommended Safetensors SDXL/SD 1.5 checkpoints, or import a complete single-file GGUF checkpoint.`;
-      }
-      
-      const clip_l = findComponentFile("clip_l");
-      const t5xxl = findComponentFile("t5xxl");
-      const vae = findComponentFile("vae");
+    if (knownDiffusionOnlyGguf) {
+      return `${filename} is not supported as a one-click model in this app. This SDXL GGUF is a diffusion-only component and needs matching VAE/text encoder files instead of being loaded with --model. Use one of the recommended Safetensors SDXL/SD 1.5 checkpoints, or import a complete single-file GGUF checkpoint.`;
+    }
+    
+    const clip_l = findComponentFile("clip_l");
+    const t5xxl = findComponentFile("t5xxl");
+    const vae = findComponentFile("vae");
 
-      const missing = [];
-      if (!clip_l) missing.push("CLIP-L Text Encoder (z. B. clip_l.safetensors oder clip_l-f16.gguf)");
-      if (!t5xxl) missing.push("T5XXL Text Encoder (z. B. t5xxl_q8_0.gguf oder t5xxl-q5_k_m.gguf)");
-      if (!vae) missing.push("VAE / Autoencoder (z. B. ae.safetensors oder ae.gguf)");
+    const missing = [];
+    if (!clip_l) missing.push("CLIP-L Text Encoder (z. B. clip_l.safetensors oder clip_l-f16.gguf)");
+    if (!t5xxl) missing.push("T5XXL Text Encoder (z. B. t5xxl_q8_0.gguf oder t5xxl-q5_k_m.gguf)");
+    if (!vae) missing.push("VAE / Autoencoder (z. B. ae.safetensors oder ae.gguf)");
 
-      if (missing.length > 0) {
-        return `${filename} ist ein Multi-File-Modell und benötigt zusätzliche Komponenten. Erstelle den Ordner 'app/models/components/' und lege dort folgende fehlende Dateien ab:\n\n` + 
-               missing.map(m => `• ${m}`).join("\n") + 
-               `\n\nBenenne die Dateien entsprechend um, damit das System sie automatisch erkennt.`;
-      }
+    if (missing.length > 0) {
+      return `${filename} ist ein Multi-File-Modell und benötigt zusätzliche Komponenten. Erstelle den Ordner 'app/models/components/' und lege dort folgende fehlende Dateien ab:\n\n` + 
+             missing.map(m => `• ${m}`).join("\n") + 
+             `\n\nBenenne die Dateien entsprechend um, damit das System sie automatisch erkennt.`;
     }
   }
 
@@ -1387,6 +1442,7 @@ function getModelInfo(filename) {
     filename: safeFilename,
     sizeBytes: stats.size,
     size: formatBytes(stats.size),
+    profile: detectModelFamily(safeFilename),
   };
 }
 
@@ -1623,6 +1679,7 @@ const server = http.createServer(async (req, res) => {
       loading: backendLoadState,
       unloading: backendUnloadState,
       settings: currentSettings,
+      profile: currentSettings.model ? detectModelFamily(currentSettings.model) : null,
       build: SERVER_BUILD,
     });
   }

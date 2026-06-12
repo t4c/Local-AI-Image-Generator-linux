@@ -534,7 +534,6 @@ export async function generateImage(prompt, negativePrompt, constraints, activeM
 
   const isFlux = activeModelName && activeModelName.toLowerCase().includes("flux");
   if (isFlux) {
-    payload.prompt = `${payload.prompt} <sd_cpp_extra_args>{"cfg_scale": 1.0, "guidance": 3.5, "sampler": "euler"}</sd_cpp_extra_args>`;
     payload.cfg_scale = 1.0;
     payload.sampler = "euler";
   }
