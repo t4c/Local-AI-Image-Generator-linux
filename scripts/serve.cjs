@@ -1057,7 +1057,12 @@ function startModelDownload(url, overrideFilename = null) {
     }
   }
 
-  const destPath = path.join(MODELS, filename);
+  const safeFilename = path.basename(filename);
+  const destPath = path.resolve(path.join(MODELS, safeFilename));
+  if (!destPath.startsWith(path.resolve(MODELS))) {
+    console.error("  [download] Prevented Path Traversal attempt:", filename);
+    return;
+  }
   const tempPath = `${destPath}.part`;
   try { fs.unlinkSync(tempPath); } catch (_) {}
   downloadState = {
@@ -1564,16 +1569,38 @@ function streamModelUpload(req, filename) {
       return;
     }
 
-    const destPath = path.join(MODELS, safeFilename);
+    const destPath = path.resolve(path.join(MODELS, safeFilename));
+    if (!destPath.startsWith(path.resolve(MODELS))) {
+      reject(new Error("Security Alert: Path Traversal detected!"));
+      return;
+    }
+
+    const MAX_UPLOAD_SIZE = 20 * 1024 * 1024 * 1024; // 20 GB
+    const contentLength = parseInt(req.headers["content-length"] || "0", 10);
+    if (contentLength > MAX_UPLOAD_SIZE) {
+      reject(new Error("Upload size limit of 20 GB exceeded (Content-Length)"));
+      return;
+    }
+
     const tempPath = `${destPath}.part`;
     const out = fs.createWriteStream(tempPath);
     let finished = false;
+    let uploadedBytes = 0;
 
     const cleanupPartial = () => {
       if (finished) return;
       out.destroy();
       try { fs.unlinkSync(tempPath); } catch (_) {}
     };
+
+    req.on("data", chunk => {
+      uploadedBytes += chunk.length;
+      if (uploadedBytes > MAX_UPLOAD_SIZE) {
+        cleanupPartial();
+        req.destroy();
+        reject(new Error("Upload size limit of 20 GB exceeded"));
+      }
+    });
 
     req.pipe(out);
     req.on("error", err => {
