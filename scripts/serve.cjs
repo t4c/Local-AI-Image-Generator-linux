@@ -779,9 +779,9 @@ async function startBackend(settings = {}) {
   if (profile.isMultiFile) {
     args.push("--diffusion-model", currentSettings.model);
     
-    const clip_l = findComponentFile("clip_l");
-    const t5xxl = findComponentFile("t5xxl");
-    const vae = findComponentFile("vae");
+    const clip_l = findComponentFile("clip_l", currentSettings.model);
+    const t5xxl = findComponentFile("t5xxl", currentSettings.model);
+    const vae = findComponentFile("vae", currentSettings.model);
     
     if (clip_l) args.push("--clip_l", clip_l);
     if (t5xxl) args.push("--t5xxl", t5xxl);
@@ -1276,7 +1276,7 @@ function detectModelFamily(modelPath) {
     res.recommendedVaeCpu = true;
     res.recommendedClipCpu = true;
     
-    const t5xxl = findComponentFile("t5xxl");
+    const t5xxl = findComponentFile("t5xxl", modelPath);
     if (t5xxl && t5xxl.toLowerCase().endsWith(".gguf")) {
       res.warning = "WARNUNG: Dein T5XXL Text-Encoder ist eine GGUF-Datei (z. B. t5xxl_q8_0.gguf). Bei manchen GGUF T5XXL-Dateien kann es in stable-diffusion.cpp zu Berechnungsfehlern (NaNs) kommen, die zu komplett weißen Bildern führen. Wenn das passiert, verwende bitte die offizielle .safetensors-Version (z. B. t5xxl_fp8_e4m3fn.safetensors).";
     }
@@ -1321,14 +1321,39 @@ function isModelFile(filename) {
   return lower.endsWith(".safetensors") || lower.endsWith(".gguf") || lower.endsWith(".ckpt");
 }
 
-function findComponentFile(type) {
-  const dirs = [
-    path.join(MODELS, "components"),
-    MODELS
-  ];
+function findComponentFile(type, modelPath = null) {
+  const dirs = [];
   
+  if (modelPath) {
+    const filename = path.basename(modelPath);
+    const ext = path.extname(filename);
+    const modelNameWithoutExt = filename.substring(0, filename.length - ext.length);
+    
+    // Determine simple family to avoid recursive dependency on detectModelFamily
+    const lowerFilename = filename.toLowerCase();
+    let modelFamily = "sd15";
+    if (lowerFilename.includes("flux")) modelFamily = "flux";
+    else if (lowerFilename.includes("sd3")) modelFamily = "sd3";
+    else if (lowerFilename.includes("wan")) modelFamily = "wan";
+    else if (lowerFilename.includes("hunyuan")) modelFamily = "hunyuan";
+    else if (lowerFilename.includes("sdxl") || lowerFilename.includes("juggernaut") || lowerFilename.includes("pony")) modelFamily = "sdxl";
+    else if (lowerFilename.includes("sd2") || lowerFilename.includes("stable-diffusion-2")) modelFamily = "sd2";
+    
+    dirs.push(path.join(MODELS, "components", modelNameWithoutExt));
+    dirs.push(path.join(MODELS, "components", modelFamily));
+  }
+  
+  dirs.push(path.join(MODELS, "components"));
+  dirs.push(MODELS);
+  
+  const uniqueDirs = [];
   for (const dir of dirs) {
-    if (!fs.existsSync(dir)) continue;
+    if (dir && !uniqueDirs.includes(dir) && fs.existsSync(dir)) {
+      uniqueDirs.push(dir);
+    }
+  }
+  
+  for (const dir of uniqueDirs) {
     const files = fs.readdirSync(dir);
     for (const f of files) {
       const lower = f.toLowerCase();
@@ -1390,9 +1415,9 @@ function getModelLoadIssue(modelPath) {
       return `${filename} is not supported as a one-click model in this app. This SDXL GGUF is a diffusion-only component and needs matching VAE/text encoder files instead of being loaded with --model. Use one of the recommended Safetensors SDXL/SD 1.5 checkpoints, or import a complete single-file GGUF checkpoint.`;
     }
     
-    const clip_l = findComponentFile("clip_l");
-    const t5xxl = findComponentFile("t5xxl");
-    const vae = findComponentFile("vae");
+    const clip_l = findComponentFile("clip_l", modelPath);
+    const t5xxl = findComponentFile("t5xxl", modelPath);
+    const vae = findComponentFile("vae", modelPath);
 
     const missing = [];
     if (!clip_l) missing.push("CLIP-L Text Encoder (z. B. clip_l.safetensors oder clip_l-f16.gguf)");

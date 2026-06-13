@@ -12,7 +12,7 @@
 ## 🖤 Why this Fork?
 The original codebase was a Windows slave. We brought out the whip and domesticated it for Linux:
 *   **100% Native Linux:** No Wine, no WSL gymnastics.
-*   **Automated CUDA Compilation:** If you have an Nvidia card, `./setup.sh` automatically compiles `stable-diffusion.cpp` with native CUDA acceleration on first run.
+*   **Automated CUDA & Vulkan Compilation:** If you have an Nvidia card, `./setup.sh` automatically compiles `stable-diffusion.cpp` with native CUDA acceleration on first run. If you are on AMD/Intel or want maximum portability, the repo also supports full Vulkan build-chains.
 *   **True LAN Party Capabilities:** The server listens on `0.0.0.0` and the React frontend dynamically grabs the API route via `window.location.hostname`. You can let your heavy GPU sweat in the basement while generating images.
 
 ---
@@ -60,6 +60,18 @@ Once these files are present, the system will automatically detect them when loa
 Open your browser at:
 `http://localhost:1420` (or your Linux server's IP within the LAN)
 
+### 6. Vulkan Architecture (Optional for AMD/Intel)
+If you are not running on Nvidia CUDA, you can compile and use the Vulkan backend instead:
+```bash
+# Compile the Vulkan backend binary manually
+cmake -B build-vulkan -DSD_VULKAN=ON -DCMAKE_BUILD_TYPE=Release
+cmake --build build-vulkan --config Release -j$(nproc)
+
+# Move the compiled server to the Linux backends folder
+cp build-vulkan/bin/sd-server app/backend/linux/sd-vulkan
+```
+Once the `sd-vulkan` binary is present in `app/backend/linux/`, the Model Manager and generation engine will automatically detect it and let you select the Vulkan GPU backend in the Web UI.
+
 ---
 
 ## 📁 Storage Structure
@@ -80,7 +92,8 @@ local-ai-image-generator/
 ## 🍆 Performance & VRAM Appetite
 Since we build directly on top of C++ (`stable-diffusion.cpp`), VRAM consumption is kept strictly on a leash.
 *   **CUDA GPU (e.g., RTX 3060):** Generates a 512x512 image (20 steps) in about **10 seconds**.
-*   **CPU Fallback:** If you don't have a GPU (why do you even do this to yourself?), it will run painfully slow on CPU cores. Get CUDA.
+*   **Vulkan GPU (AMD / Intel fallback):** Outstanding multi-platform hardware acceleration, automatically used if `sd-vulkan` is present and selected.
+*   **CPU Fallback:** If you don't have a GPU (why do you even do this to yourself?), it will run painfully slow on CPU cores. Get CUDA or Vulkan.
 
 ---
 
