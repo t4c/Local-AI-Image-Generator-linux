@@ -56,11 +56,7 @@ Once these files are present, the system will automatically detect them when loa
 > ```
 > This script will fetch and place the VAE, CLIP-L, and the stable **FP8 Safetensors T5XXL Text Encoder** into the correct folder, with resume capability. This avoids mathematical NaNs in stable-diffusion.cpp that lead to blank/white images.
 
-### 5. Have Fun
-Open your browser at:
-`http://localhost:1420` (or your Linux server's IP within the LAN)
-
-### 6. Vulkan Architecture (Optional for AMD/Intel)
+### 5. Vulkan Architecture (Optional for AMD/Intel)
 If you are not running on Nvidia CUDA, you can compile and use the Vulkan backend instead:
 ```bash
 # Compile the Vulkan backend binary manually
@@ -71,6 +67,10 @@ cmake --build build-vulkan --config Release -j$(nproc)
 cp build-vulkan/bin/sd-server app/backend/linux/sd-vulkan
 ```
 Once the `sd-vulkan` binary is present in `app/backend/linux/`, the Model Manager and generation engine will automatically detect it and let you select the Vulkan GPU backend in the Web UI.
+
+### 6. Have Fun
+Open your browser at:
+`http://localhost:1420` (or your Linux server's IP within the LAN)
 
 ---
 
