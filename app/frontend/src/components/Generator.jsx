@@ -98,6 +98,8 @@ function Generator({
             settings.sampler !== constraints.sampler ||
             parseInt(settings.threads) !== parseInt(constraints.threads) ||
             Boolean(settings.useGpu) !== (constraints.useGpu !== false) ||
+            Boolean(settings.vaeTiling) !== (constraints.vaeTiling === true) ||
+            Boolean(settings.vaeOnCpu) !== (constraints.vaeOnCpu !== false) ||
             (settings.backendType || (settings.useGpu === false ? "cpu" : "auto")) !== (constraints.backendType || (constraints.useGpu === false ? "cpu" : "auto"))) {
           needsRestart = true;
         }

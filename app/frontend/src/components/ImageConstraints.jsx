@@ -5,14 +5,14 @@ const ASPECT_RATIOS = [
   { id: "1:1", label: "1:1 Square", width: 512, height: 512, sdxl_width: 1024, sdxl_height: 1024, desc: "Social posts & avatars" },
   { id: "4:3", label: "4:3 Photo", width: 640, height: 480, sdxl_width: 1152, sdxl_height: 864, desc: "Classic photo look" },
   { id: "16:9", label: "16:9 Landscape", width: 768, height: 432, sdxl_width: 1216, sdxl_height: 684, desc: "Widescreen landscape" },
-  { id: "9:16", label: "9:16 Portrait", width: 432, height: 768, sdxl_width: 684, sdxl_height: 1216, desc: "Tall phone screen" }
+  { id: "9:16", label: "9:16 Portrait", width: 432, height: 768, sdxl_width: 832, sdxl_height: 1216, desc: "Tall phone screen (Pony optimized)" }
 ];
 
 const isSD15OrCustomModel = (modelName) => {
   if (!modelName) return true;
   const name = modelName.toLowerCase();
   if (name.includes("flux") || name.includes("schnell")) return false;
-  if (name.includes("sdxl") || name.includes("lightning") || name.includes("turbo")) return false;
+  if (name.includes("sdxl") || name.includes("lightning") || name.includes("turbo") || name.includes("pony") || name.includes("realvis") || name.includes("juggernaut") || name.includes("xl")) return false;
   if (name.includes("sd3")) return false;
   return true;
 };
@@ -179,6 +179,45 @@ function ImageConstraints({ constraints, setConstraints, activeModel, specs, bac
                   })}
                 </div>
               </div>
+
+              {/* Custom Dimensions Override */}
+              <div style={{ display: "flex", gap: "12px", marginTop: "12px" }}>
+                <div className="m3-text-field" style={{ flex: 1 }}>
+                  <label className="m3-text-field-label">Custom Width (px)</label>
+                  <input
+                    type="number"
+                    className="m3-input"
+                    value={constraints.width}
+                    onChange={(e) => {
+                      let val = parseInt(e.target.value) || 0;
+                      if (isSD15OrCustom && val > 512) val = 512;
+                      updateConstraint("width", val);
+                    }}
+                    min="64"
+                    max={isSD15OrCustom ? "512" : "2048"}
+                    step="64"
+                    style={{ height: "40px", width: "100%", padding: "0 12px", boxSizing: "border-box" }}
+                  />
+                </div>
+                <div className="m3-text-field" style={{ flex: 1 }}>
+                  <label className="m3-text-field-label">Custom Height (px)</label>
+                  <input
+                    type="number"
+                    className="m3-input"
+                    value={constraints.height}
+                    onChange={(e) => {
+                      let val = parseInt(e.target.value) || 0;
+                      if (isSD15OrCustom && val > 512) val = 512;
+                      updateConstraint("height", val);
+                    }}
+                    min="64"
+                    max={isSD15OrCustom ? "512" : "2048"}
+                    step="64"
+                    style={{ height: "40px", width: "100%", padding: "0 12px", boxSizing: "border-box" }}
+                  />
+                </div>
+              </div>
+
             </div>
           </div>
 

@@ -105,7 +105,7 @@ function App() {
     useTaesd: true,
     useFlashAttn: true,
     useTiling: false,
-    vaeTiling: false,
+    vaeTiling: true,
     vaeOnCpu: true,
     threads: 4,
     backendType: "auto",
@@ -309,7 +309,13 @@ function App() {
         height = 1024;
         sampler = "euler";
         vaeOnCpu = true;
-      } else if (filename.includes("sdxl") || filename.includes("realvis") || filename.includes("juggernaut") || filename.includes("pony") || filename.includes("xl")) {
+      } else if (filename.includes("pony")) {
+        steps = 25;
+        cfgScale = 6.0;
+        width = 832;
+        height = 1216;
+        sampler = "euler_a";
+      } else if (filename.includes("sdxl") || filename.includes("realvis") || filename.includes("juggernaut") || filename.includes("xl")) {
         steps = filename.includes("lightning") ? 4 : 25;
         cfgScale = filename.includes("lightning") ? 1.0 : 5.0;
         width = 1024;

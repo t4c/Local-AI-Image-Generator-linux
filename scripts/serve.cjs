@@ -87,7 +87,7 @@ let currentSettings = {
   threads:  8,
   useGpu:   true,
   backendType: "auto",
-  vaeTiling: false,
+  vaeTiling: true,
   vaeOnCpu:  true,
 };
 
