@@ -25,3 +25,11 @@ Thumbs.db
 
 # output images folder
 /app/outputs    
+
+# Ignore local scripts and outputs
+scripts/generate_*.py
+test_*.py
+*.png
+*.json
+check_sdcpp_result.py
+status_response.json

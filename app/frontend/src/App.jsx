@@ -309,7 +309,7 @@ function App() {
         height = 1024;
         sampler = "euler";
         vaeOnCpu = true;
-      } else if (filename.includes("sdxl") || filename.includes("juggernaut") || filename.includes("pony")) {
+      } else if (filename.includes("sdxl") || filename.includes("realvis") || filename.includes("juggernaut") || filename.includes("pony") || filename.includes("xl")) {
         steps = filename.includes("lightning") ? 4 : 25;
         cfgScale = filename.includes("lightning") ? 1.0 : 5.0;
         width = 1024;

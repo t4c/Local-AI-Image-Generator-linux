@@ -1280,7 +1280,7 @@ function detectModelFamily(modelPath) {
     if (t5xxl && t5xxl.toLowerCase().endsWith(".gguf")) {
       res.warning = "WARNUNG: Dein T5XXL Text-Encoder ist eine GGUF-Datei (z. B. t5xxl_q8_0.gguf). Bei manchen GGUF T5XXL-Dateien kann es in stable-diffusion.cpp zu Berechnungsfehlern (NaNs) kommen, die zu komplett weißen Bildern führen. Wenn das passiert, verwende bitte die offizielle .safetensors-Version (z. B. t5xxl_fp8_e4m3fn.safetensors).";
     }
-  } else if (filename.includes("sdxl") || filename.includes("juggernaut") || filename.includes("pony")) {
+  } else if (filename.includes("sdxl") || filename.includes("realvis") || filename.includes("juggernaut") || filename.includes("pony") || filename.includes("xl")) {
     res.family = "sdxl";
     res.defaultSteps = filename.includes("lightning") ? 4 : 25;
     res.defaultCfgScale = filename.includes("lightning") ? 1.0 : 5.0;
@@ -1336,7 +1336,7 @@ function findComponentFile(type, modelPath = null) {
     else if (lowerFilename.includes("sd3")) modelFamily = "sd3";
     else if (lowerFilename.includes("wan")) modelFamily = "wan";
     else if (lowerFilename.includes("hunyuan")) modelFamily = "hunyuan";
-    else if (lowerFilename.includes("sdxl") || lowerFilename.includes("juggernaut") || lowerFilename.includes("pony")) modelFamily = "sdxl";
+    else if (lowerFilename.includes("sdxl") || lowerFilename.includes("realvis") || lowerFilename.includes("juggernaut") || lowerFilename.includes("pony") || lowerFilename.includes("xl")) modelFamily = "sdxl";
     else if (lowerFilename.includes("sd2") || lowerFilename.includes("stable-diffusion-2")) modelFamily = "sd2";
     
     dirs.push(path.join(MODELS, "components", modelNameWithoutExt));
